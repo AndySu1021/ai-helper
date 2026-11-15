@@ -1,0 +1,71 @@
+{
+  "_comment": "將此檔案複製至專案的 .claude/settings.json 並依實際路徑調整。此設定強制執行 agent 的讀寫權限，對應 spec §6.1 的要求。",
+
+  "agents": {
+    "test-writer": {
+      "_comment": "只能寫入測試目錄，禁止寫入實作目錄。依 paths.test 設定調整 allowedPaths。",
+      "allowedTools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+      "allowedPaths": [
+        "**/*_test.go",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.test.py",
+        "tests/**",
+        "tmp/test-report.md",
+        "tmp/requirements.md",
+        "tmp/plan.md",
+        "tmp/schema.md"
+      ],
+      "deniedPaths": [
+        "internal/**",
+        "pkg/**",
+        "src/**",
+        "cmd/**"
+      ]
+    },
+
+    "implementer": {
+      "_comment": "只能寫入實作目錄，測試目錄為唯讀。依 paths.impl 設定調整 allowedPaths。",
+      "allowedTools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+      "allowedPaths": [
+        "internal/**",
+        "pkg/**",
+        "src/**",
+        "cmd/**",
+        "tmp/plan.md",
+        "tmp/schema.md"
+      ],
+      "deniedPaths": [
+        "**/*_test.go",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.test.py",
+        "tests/**"
+      ]
+    },
+
+    "reviewer": {
+      "_comment": "完全唯讀。Bash 只允許 git 讀取指令。",
+      "allowedTools": ["Read", "Glob", "Grep", "Bash"],
+      "allowedBashCommands": [
+        "git diff*",
+        "git log*",
+        "git show*",
+        "git status*",
+        "git rev-parse*"
+      ],
+      "deniedTools": ["Write", "Edit"]
+    },
+
+    "security-auditor": {
+      "_comment": "完全唯讀。Bash 只允許 git 讀取指令與讀取掃描結果。",
+      "allowedTools": ["Read", "Bash"],
+      "allowedBashCommands": [
+        "git diff*",
+        "git log*",
+        "cat tmp/.security-raw/*"
+      ],
+      "deniedTools": ["Write", "Edit", "Glob", "Grep"]
+    }
+  }
+}

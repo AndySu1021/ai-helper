@@ -1,0 +1,47 @@
+---
+stage: review
+status: draft
+created: YYYY-MM-DD
+source: ""
+---
+
+# 程式碼審查報告
+
+審查範圍：<base_branch>...HEAD
+檢查規則：預設規則 + 專案自訂
+變更檔案數：X
+發現問題：X blocker, X warning, X nit
+
+---
+
+## Blocker（必須修正）
+
+### [blocker] <檔案>:<行號> — <問題標題>
+
+<問題說明>
+
+**建議修正**：<具體做法>
+
+---
+
+## Warning（建議修正）
+
+### [warning] <檔案>:<行號> — <問題標題>
+
+<問題說明>
+
+**建議修正**：<具體做法>
+
+---
+
+## Nit（次要建議）
+
+- [nit] `<檔案>:<行號>` — <說明>
+
+---
+
+## 審查結論
+
+**裁定：APPROVE / REQUEST CHANGES**
+
+<1-2 句總結>

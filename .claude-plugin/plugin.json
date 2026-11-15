@@ -1,0 +1,18 @@
+{
+  "name": "forge",
+  "description": "功能開發流程 plugin：各階段 skill 獨立執行，工程師自行組合。包含需求討論、計畫撰寫、TDD 實作、程式碼審查、安全掃描、MR 審查與建立。",
+  "version": "0.5.0",
+  "author": {
+    "name": "AndySu"
+  },
+  "keywords": ["tdd", "code-review", "security", "gitlab", "brainstorm", "plan", "implement", "mr-review", "release", "changelog"],
+  "commands": [
+    "./commands/"
+  ],
+  "agents": [
+    "./agents/test-writer.md",
+    "./agents/implementer.md",
+    "./agents/reviewer.md",
+    "./agents/security-auditor.md"
+  ]
+}

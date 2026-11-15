@@ -1,0 +1,14 @@
+{
+  "name": "ai-helper-marketplace",
+  "description": "AI Helper plugin marketplace",
+  "owner": {
+    "name": "AndySu"
+  },
+  "plugins": [
+    {
+      "name": "forge",
+      "source": "./",
+      "description": "功能開發流程 plugin：需求討論、計畫撰寫、TDD、程式碼審查、安全掃描，到建立 MR 的完整自動化流程。"
+    }
+  ]
+}
