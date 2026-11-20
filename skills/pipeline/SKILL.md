@@ -56,8 +56,8 @@ Pipeline 確認 — <ticket-id>
 
 請確認以下資訊：
 1. Fix version（例：v1.2.0）：<自動解析的值，若無法解析則留空請填寫>
-2. 分支描述（short_desc，英文小寫 + 底線，例：add_user_auth）：
 
+分支描述由系統自動從 ticket 標題產生，不需填寫。
 產生的 feature branch：<fix_version>/feat/<ticket-id>_<short_desc>
 Base branch：release/<fix_version>
 
@@ -138,8 +138,8 @@ EOF
 **A.3 判斷是否需要 API schema**
 
 讀取 `tmp/${TICKET_ID}/plan.md` 的「API 變更」區段：
-- 若有任何端點列出（非「無」）→ 自動執行 `/api-schema`，輸出 `tmp/${TICKET_ID}/schema.md`
-- 若無 API 變更 → 跳過此步驟
+- 若有任何端點的**新增、刪除、路徑變更、請求欄位變更、回應欄位變更**（即任何 request 或 response 結構有異動）→ 自動執行 `/api-schema`，輸出 `tmp/${TICKET_ID}/schema.md`
+- 若確認完全無 API 異動 → 跳過此步驟
 
 ---
 
@@ -247,8 +247,8 @@ Worktree 路徑：<WORKTREE_PATH>（保留供偵錯）
 **並行執行**，diff 來源為 worktree 的 feature branch：
 
 ```bash
-# 在 worktree 內取得相對於 base branch 的 diff
-cd "${WORKTREE_PATH}" && git diff "origin/${BASE_BRANCH}"...HEAD
+# 在 worktree 內取得相對於 base branch 的 diff（git -C 不切換目錄，不觸發 hooks 警告）
+git -C "${WORKTREE_PATH}" diff "origin/${BASE_BRANCH}"...HEAD
 ```
 
 - `/code-review` → `tmp/${TICKET_ID}/review.md`
@@ -286,8 +286,7 @@ Worktree 路徑：<WORKTREE_PATH>（保留供偵錯）
 在 worktree 內 push feature branch：
 
 ```bash
-cd "${WORKTREE_PATH}"
-git push -u origin "${FEATURE_BRANCH}"
+git -C "${WORKTREE_PATH}" push -u origin "${FEATURE_BRANCH}"
 ```
 
 執行 `/gitlab-mr` SKILL.md 完整流程，傳入：

@@ -39,18 +39,24 @@ TICKET_ID=$(cat tmp/.current-ticket)
 
 ## 步驟 1：取得 diff
 
+若呼叫方傳入 `working_dir`，所有 git 指令加上 `-C "${WORKING_DIR}"`；否則在當前目錄執行。
+
 ```bash
+# WORKING_DIR 由呼叫方傳入（pipeline worktree 情境），未傳入時為 "."
+GIT="git -C ${WORKING_DIR:-.}"
+
 # 推斷 base branch：優先從 remote HEAD 取，fallback 為 main
-BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
-git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only
-git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat
+BASE_BRANCH=$(${GIT} symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
+
+${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only
+${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat
 ```
 
 **大型 diff 判斷**（取得 name-only 與 stat 後執行）：
 
 ```bash
-CHANGED_FILES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
-CHANGED_LINES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
+CHANGED_FILES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
+CHANGED_LINES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
 ```
 
 - 若 `CHANGED_FILES > 30` 或 `CHANGED_LINES > 1000`：啟動**分批審查模式**（見步驟 1.5）
@@ -132,10 +138,18 @@ Coding style 驗證重點：
 
 ## 步驟 5：程式碼審查
 
-依照審查規則逐項檢查每個變更，將發現記錄為以下格式：
+依照審查規則逐項檢查每個變更。
+
+**提出問題前，必須先確認問題確實存在**：
+- 引用觸發問題的具體程式碼片段（行號 + 內容）
+- 說明為何這段程式碼有問題（邏輯推導或測試路徑）
+- 若無法從程式碼直接確認，不得提出該問題
+
+每個發現記錄為以下格式：
 
 ```
 [等級] 檔案路徑:行號 — 問題說明
+證明：<觸發此問題的具體程式碼或情境>
 建議：<具體修正方式>
 ```
 

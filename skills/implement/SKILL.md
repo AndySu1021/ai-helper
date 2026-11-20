@@ -18,34 +18,21 @@ tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 
 ---
 
-## 步驟 0：讀取 ticket-id 與推斷專案設定
+## 步驟 0：讀取 ticket-id 與專案設定
 
 ```bash
 TICKET_ID=$(cat tmp/.current-ticket)
 ```
 
-依以下順序推斷專案語言與測試指令：
+固定設定值：
 
-```bash
-# 偵測語言
-[ -f go.mod ]           && LANG=go
-[ -f package.json ]     && LANG=node
-[ -f requirements.txt ] && LANG=python
-[ -f Cargo.toml ]       && LANG=rust
-```
-
-| 語言 | `commands.test` 預設 | `paths.test` 預設 | `paths.impl` 預設 |
-|------|---------------------|-------------------|-------------------|
-| go | `go test ./...` | `**/*_test.go` | `**/*.go`（排除 `*_test.go`）|
-| node | `npm test` | `**/*.test.ts`, `**/*.spec.ts`, `**/*.test.js` | `src/**` |
-| python | `pytest` | `tests/**`, `**/*_test.py` | 排除 tests 以外 |
-| rust | `cargo test` | `**/tests/**`, `src/**` (含 `#[cfg(test)]`) | `src/**` |
-
-若語言無法推斷，使用 `AskUserQuestion` 詢問：「無法自動偵測專案語言，請告知：1) 語言 2) 測試指令 3) 測試檔路徑規則。」
-
-固定預設值（不可由外部覆蓋）：
-- `min_coverage`：80%
-- `max_impl_retry`：3
+| 設定 | 值 |
+|------|---|
+| `commands.test` | `go test ./...` |
+| `paths.test` | `**/*_test.go` |
+| `paths.impl` | `**/*.go`（排除 `*_test.go`）|
+| `min_coverage` | 80% |
+| `max_impl_retry` | 3 |
 
 ---
 
@@ -71,7 +58,23 @@ git rev-parse HEAD > "tmp/${TICKET_ID}/.test-baseline"
 - ticket-id
 - 步驟 0 推斷的 `paths.test`、`commands.test`
 
-test-writer 完成後確認 `tmp/${TICKET_ID}/test-report.md` 已產生。
+test-writer 完成後執行以下驗證：
+
+```bash
+# 1. 確認 test-report.md 已產生
+[ -f "tmp/${TICKET_ID}/test-report.md" ] || { echo "ERROR: test-report.md 未產生"; exit 1; }
+
+# 2. 確認有實際的測試檔案被寫入（相較基準點有新增或修改）
+TEST_BASELINE=$(cat "tmp/${TICKET_ID}/.test-baseline")
+CHANGED_TEST_FILES=$(git diff --name-only "${TEST_BASELINE}" -- <paths.test glob>)
+if [ -z "${CHANGED_TEST_FILES}" ]; then
+  echo "ERROR: test-writer 未產生任何測試檔案。請重新執行 test-writer agent。"
+  exit 1
+fi
+echo "測試檔案已產生：${CHANGED_TEST_FILES}"
+```
+
+若驗證失敗，重新執行 test-writer agent，要求明確建立測試檔案。
 
 **【人工關卡】** — 顯示：
 
@@ -126,21 +129,10 @@ git diff --name-only "${TEST_BASELINE}" -- <paths.test glob>
 
 ## 步驟 5：覆蓋率驗證
 
-依語言執行覆蓋率檢查：
-
 ```bash
-# Go
 go test -coverprofile="tmp/${TICKET_ID}/.coverage.out" ./...
 go tool cover -func="tmp/${TICKET_ID}/.coverage.out" | grep "^total:" | awk '{print $3}'
-
-# TypeScript/JavaScript（jest）
-jest --coverage --coverageReporters=text-summary 2>&1 | grep "All files"
-
-# Python
-pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
 ```
-
-若工具不支援覆蓋率，顯示警告「無法取得覆蓋率數據」並繼續（不阻擋流程）。
 
 **計數器**：`impl_retry_count`（初始為 0）
 

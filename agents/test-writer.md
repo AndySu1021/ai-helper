@@ -12,8 +12,9 @@ context: fork
 從呼叫方取得：
 - `tmp/<ticket-id>/plan.md` — 實作計畫（需求、範圍、測試策略）
 - `tmp/<ticket-id>/schema.md` — API schema（端點、請求/回應結構）
-- 測試路徑 glob（由呼叫方的語言推斷傳入，例如 `**/*_test.go`）
 - ticket-id（`cat tmp/.current-ticket`）
+
+固定設定：`paths.test = **/*_test.go`、`commands.test = go test ./...`
 
 ## 步驟 0：讀取 ticket-id
 
@@ -60,18 +61,30 @@ fi
 
 ## 步驟 3：撰寫測試
 
-將測試寫入 `paths.test` 指定的路徑。
+**先列出即將建立或修改的測試檔案清單**，再開始寫入，確保每個需求都對應到具體的測試函式。
+
+將測試寫入 `paths.test` 指定的路徑。每個需求項目**至少對應一個具體的測試函式**，不可只更新 test-report.md 而不寫測試程式碼。
 
 **只能寫入測試目錄，禁止碰觸以下路徑**：
 - `paths.impl` 下的所有檔案
 - `tmp/` 目錄（除 test-report.md 外）
 - 任何非測試目錄的檔案
 
-每個測試需有清楚的命名，格式：`Test<功能>_<情境>`（Go）或等效的語言慣例。
+每個測試需有清楚的命名，格式：`Test<功能>_<情境>`。
+
+**測試檔案寫入後，立即執行以下確認**：
+
+```bash
+TICKET_ID=$(cat tmp/.current-ticket)
+BASELINE=$(cat "tmp/${TICKET_ID}/.test-baseline" 2>/dev/null || git rev-parse HEAD)
+git diff --name-only "${BASELINE}" -- <paths.test glob>
+```
+
+若輸出為空（無任何測試檔案被建立或修改），**必須停止並自我修正**：重新建立測試檔案，不可繼續到步驟 4。
 
 ## 步驟 4：執行測試確認全部失敗
 
-執行測試指令（來自設定的 `commands.test`，或預設 `go test ./...`）：
+執行測試指令：
 
 ```bash
 <test_command>
@@ -128,3 +141,6 @@ schema_available: <true / false>
 - **禁止撰寫假測試**（測試通過但未實際驗證行為的測試）。
 - 若規格不清，列為待確認問題，不可自行補假設。
 - 所有新測試在交付時必須是 FAIL 狀態（Red）。
+- **搜尋檔案或內容時，優先使用 `Glob`（找檔案）與 `Grep`（搜文字）工具；若必須用 bash，使用 `grep -rl` 或 pipe（`find ... | xargs grep`），禁止 `find -exec`。**
+- **禁止使用 `cat -A`、`cat file | sed`、`cat file | grep` 等 pipe 指令**；需要讀取特定行範圍時，使用 `Read` 工具並指定 offset/limit。
+- **禁止 `cd <path> && git`**；需要在指定目錄執行 git 時，使用 `git -C <path>`。

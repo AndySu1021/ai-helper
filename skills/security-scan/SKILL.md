@@ -26,25 +26,11 @@ TICKET_ID=$(cat tmp/.current-ticket)
 
 ---
 
-## 步驟 1：推斷語言與掃描工具
+## 步驟 1：掃描工具設定
 
-```bash
-[ -f go.mod ]           && LANG=go
-[ -f package.json ]     && LANG=node
-[ -f requirements.txt ] && LANG=python
-[ -f Cargo.toml ]       && LANG=rust
-```
-
-依語言決定預設依賴掃描指令：
-
-| 語言 | 依賴掃描指令 | semgrep 規則集 |
-|------|------------|--------------|
-| go | `govulncheck ./...` | `p/golang` |
-| node | `npm audit --json` | `p/javascript` |
-| python | `pip-audit` | `p/python` |
-| rust | `cargo audit` | `p/rust` |
-
-所有語言均額外執行 `p/security-audit`（通用安全規則）。
+固定設定：
+- 依賴掃描：`govulncheck ./...`
+- semgrep 規則集：`p/golang`、`p/security-audit`
 
 ---
 
@@ -70,10 +56,13 @@ bash skills/security-scan/scripts/run-scanners.sh
 
 ## 步驟 2.5：大型 diff 判斷
 
+若呼叫方傳入 `working_dir`，所有 git 指令加上 `-C "${WORKING_DIR}"`；否則在當前目錄執行。
+
 ```bash
-BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
-CHANGED_FILES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
-CHANGED_LINES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
+GIT="git -C ${WORKING_DIR:-.}"
+BASE_BRANCH=$(${GIT} symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
+CHANGED_FILES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
+CHANGED_LINES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
 ```
 
 - 若 `CHANGED_FILES > 30` 或 `CHANGED_LINES > 1000`：啟動**分批語意審查**（見下方）

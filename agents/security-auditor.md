@@ -89,3 +89,6 @@ context: fork
 - 只顯示問題的位置（檔案:行號）和類型，不重複敏感值內容。
 - 判斷誤報時必須說明依據，不可主觀排除問題。
 - 若無安全問題，明確輸出「本次審查無發現安全問題」，不可留白。
+- **搜尋檔案或內容時，優先使用 `Grep` 工具；若必須用 bash，使用 `grep -rl` 或 pipe（`find ... | xargs grep`），禁止 `find -exec`。**
+- **禁止使用 `cat -A`、`cat file | sed`、`cat file | grep` 等 pipe 指令**；需要讀取特定行範圍時，使用 `Read` 工具並指定 offset/limit。
+- **禁止 `cd <path> && git`**；需要在指定目錄執行 git 時，使用 `git -C <path>`。
