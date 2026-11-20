@@ -5,13 +5,14 @@
   "author": {
     "name": "AndySu"
   },
-  "keywords": ["tdd", "code-review", "security", "gitlab", "brainstorm", "plan", "implement", "mr-review", "release", "changelog"],
+  "keywords": ["tdd", "code-review", "security", "gitlab", "brainstorm", "plan", "implement", "mr-review", "release", "changelog", "pipeline", "smoke-test"],
   "commands": [
     "./commands/",
     "./skills/"
   ],
   "agents": [
     "./agents/test-writer.md",
+    "./agents/test-reviewer.md",
     "./agents/implementer.md",
     "./agents/reviewer.md",
     "./agents/security-auditor.md"
