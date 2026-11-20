@@ -1,7 +1,7 @@
 ---
 name: bugfix
 description: Bug 修復流程。跳過 brainstorm/plan-writer/api-schema，直接進入 TDD 實作。適用於：已知原因的 bug（生產環境緊急修復、QA 驗收後開出的 bug ticket）、不涉及 API 設計變動的修復。需要釐清需求或設計新端點，請改用 /plan-writer + /implement。
-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
+tools: ["Read", "Write", "Bash", "AskUserQuestion", "EnterWorktree", "ExitWorktree"]
 ---
 
 # Bugfix — Bug 修復流程
@@ -142,7 +142,7 @@ bugfix: true
 
 ---
 
-## 步驟 2.5：建立修復分支
+## 步驟 2.5：確定分支名稱並建立 Worktree
 
 從 ticket 取得以下資訊：
 - **Fix version**：ticket 的 Fix Version / Target Version 欄位（如 `v1.2.3`、`2024.Q4`）
@@ -157,13 +157,15 @@ bugfix: true
 
 範例：`v1.2.3/bug/PROJ-1234_null_pointer_on_login`
 
-建立並切換分支：
+若 Fix version 欄位不存在，使用 `AskUserQuestion` 詢問：「Ticket 無 Fix Version，請提供目標版本（例如 v1.2.3）。」
 
-```bash
-git checkout -b "<branch_name>"
+分支名稱確認後，使用 `EnterWorktree` 建立並切換至獨立 worktree，以隔離本次修復的所有變更：
+
+```
+EnterWorktree(branch: "<branch_name>")
 ```
 
-若 Fix version 欄位不存在，使用 `AskUserQuestion` 詢問：「Ticket 無 Fix Version，請提供目標版本（例如 v1.2.3）。」
+後續所有步驟（測試撰寫、實作、驗證、推送）均在此 worktree 中進行。
 
 ---
 
@@ -257,29 +259,23 @@ pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
 
 ---
 
-## 步驟 7：建立 PR / MR
+## 步驟 7：建立 MR
 
-推送分支並建立 PR 或 MR：
+此步驟為**強制執行**，不可略過或以推送分支代替。
 
-**GitHub（`gh` CLI）：**
-```bash
-git push -u origin "<branch_name>"
-gh pr create \
-  --title "fix(<ticket_no>): <short_description>" \
-  --body "## 問題描述\n\n<plan.md 的問題描述>\n\n## 修復方式\n\n<plan.md 的修復方式>\n\n## 測試\n\n- [ ] 新增重現測試\n- [ ] 所有測試通過\n- [ ] 覆蓋率 ≥ 80%\n\nRelated: <ticket 連結>"
+呼叫 `/gitlab-mr` skill 建立 MR：
+
+```
+/gitlab-mr
 ```
 
-**GitLab（`glab` CLI）：**
-```bash
-git push -u origin "<branch_name>"
-glab mr create \
-  --title "fix(<ticket_no>): <short_description>" \
-  --description "## 問題描述\n\n<plan.md 的問題描述>\n\n## 修復方式\n\n<plan.md 的修復方式>\n\n## 測試\n\n- [ ] 新增重現測試\n- [ ] 所有測試通過\n- [ ] 覆蓋率 ≥ 80%\n\nRelated: <ticket 連結>"
+MR 建立成功後，使用 `ExitWorktree` 離開 worktree：
+
+```
+ExitWorktree()
 ```
 
-自動偵測使用 `gh` 或 `glab`：先執行 `gh repo view` 判斷是否為 GitHub，否則嘗試 `glab`；若皆不可用，輸出推送指令與 PR/MR 內容讓使用者手動建立。
-
-PR/MR 建立後輸出：
+最後輸出完成摘要：
 
 ```
 ══════════════════════════════════
