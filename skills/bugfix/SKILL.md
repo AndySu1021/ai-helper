@@ -69,13 +69,37 @@ printf '%s' "${TICKET_ID}" > tmp/.current-ticket
 
 ## 步驟 1：釐清問題
 
-使用 `AskUserQuestion` 確認：
+若 `$ARGUMENTS` 包含 ticket 格式（如 `PROJ-1234`），先讀取 ticket 內容：
+- 讀取 ticket 本身的描述、重現步驟、預期行為
+- **若有母票（parent ticket / epic），一併讀取母票描述與驗收條件**
+- **若 ticket 有評論（comments），一併讀取所有評論**（開發者補充、QA 備注、PM 說明等，均視為需求的一部分）
+
+整合以上資訊後，使用 `AskUserQuestion` 確認不清楚之處：
 
 > 請描述：
 > 1. 問題是什麼？（觀察到的錯誤行為）
 > 2. 預期正確行為是什麼？
 > 3. 修復方式是否已確定？（若不確定，建議改用 `/plan-writer`）
 > 4. 是否涉及 API 或 schema 變動？（若有，建議改用 `/plan-writer`）
+
+若 ticket 資訊已足夠回答以上問題，可省略 `AskUserQuestion`，直接進入步驟 2。
+
+**【判斷是否為真正的 bug】**
+
+釐清完成後，判斷問題性質：
+- 若屬於**使用者操作問題**（非程式缺陷，只是不知道如何使用功能），輸出說明並停止，不進行修復：
+
+  ```
+  ══════════════════════════════════
+  ℹ️ 非 bug，無需修復
+  ══════════════════════════════════
+  根據描述，這是使用方式的問題，而非程式缺陷。
+  
+  建議操作：<正確使用方式說明>
+  ══════════════════════════════════
+  ```
+
+- 若確認為程式 bug，繼續步驟 2。
 
 ---
 
@@ -118,6 +142,31 @@ bugfix: true
 
 ---
 
+## 步驟 2.5：建立修復分支
+
+從 ticket 取得以下資訊：
+- **Fix version**：ticket 的 Fix Version / Target Version 欄位（如 `v1.2.3`、`2024.Q4`）
+- **Ticket 號碼**：如 `PROJ-1234`
+- **Short description**：從 ticket 標題取 3–5 個英文單字，以底線連接，全部小寫（如 `null_pointer_on_login`）
+
+分支命名規則：
+
+```
+<fix_version>/bug/<ticket_no>_<short_description>
+```
+
+範例：`v1.2.3/bug/PROJ-1234_null_pointer_on_login`
+
+建立並切換分支：
+
+```bash
+git checkout -b "<branch_name>"
+```
+
+若 Fix version 欄位不存在，使用 `AskUserQuestion` 詢問：「Ticket 無 Fix Version，請提供目標版本（例如 v1.2.3）。」
+
+---
+
 ## 步驟 3：測試撰寫（test-writer agent）
 
 記錄測試基準點：
@@ -135,25 +184,20 @@ test-writer 會自動偵測 `schema.md` 不存在並進入降級模式，僅依 
 
 test-writer 完成後確認 `tmp/${TICKET_ID}/test-report.md` 已產生。
 
-**【人工關卡】** — 顯示：
+**【自動驗證】** — test-writer agent 完成後，立即執行測試指令：
 
-```
-══════════════════════════════════
-人工關卡：測試確認
-══════════════════════════════════
-測試撰寫完成，請審閱：
-
-tmp/<ticket-id>/test-report.md
-
-確認以下事項：
-- 測試是否重現了 bug（預期為失敗）
-- 邊界條件是否涵蓋
-
-回覆「確認」繼續，或說明需要調整的測試。
-══════════════════════════════════
+```bash
+<commands.test>
 ```
 
-使用 `AskUserQuestion` 等待確認。若使用者要求調整，重新執行 test-writer agent。
+驗收標準：
+- 新增的測試**必須失敗**（確認重現了 bug）
+- 既有測試**不可新增失敗**
+
+若新增測試未如預期失敗，或既有測試被破壞：
+- 重新執行 test-writer agent，要求修正
+- 無上限重試，直到驗收標準通過為止
+- 每次重試須在 `tmp/${TICKET_ID}/test-report.md` 更新原因與修正方向
 
 ---
 
@@ -213,15 +257,37 @@ pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
 
 ---
 
-## 步驟 7：完成
+## 步驟 7：建立 PR / MR
 
-實作通過後輸出：
+推送分支並建立 PR 或 MR：
+
+**GitHub（`gh` CLI）：**
+```bash
+git push -u origin "<branch_name>"
+gh pr create \
+  --title "fix(<ticket_no>): <short_description>" \
+  --body "## 問題描述\n\n<plan.md 的問題描述>\n\n## 修復方式\n\n<plan.md 的修復方式>\n\n## 測試\n\n- [ ] 新增重現測試\n- [ ] 所有測試通過\n- [ ] 覆蓋率 ≥ 80%\n\nRelated: <ticket 連結>"
+```
+
+**GitLab（`glab` CLI）：**
+```bash
+git push -u origin "<branch_name>"
+glab mr create \
+  --title "fix(<ticket_no>): <short_description>" \
+  --description "## 問題描述\n\n<plan.md 的問題描述>\n\n## 修復方式\n\n<plan.md 的修復方式>\n\n## 測試\n\n- [ ] 新增重現測試\n- [ ] 所有測試通過\n- [ ] 覆蓋率 ≥ 80%\n\nRelated: <ticket 連結>"
+```
+
+自動偵測使用 `gh` 或 `glab`：先執行 `gh repo view` 判斷是否為 GitHub，否則嘗試 `glab`；若皆不可用，輸出推送指令與 PR/MR 內容讓使用者手動建立。
+
+PR/MR 建立後輸出：
 
 ```
 ══════════════════════════════════
 ✅ 修復完成
 ══════════════════════════════════
 所有測試通過，覆蓋率：<X%>
+分支：<branch_name>
+PR/MR：<連結>
 
 建議後續步驟：
   /code-review      程式碼審查（確認符合需求與 coding style）
@@ -236,9 +302,13 @@ pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
 ## 規則
 
 - 若使用者確認問題涉及 schema 變動，停止並建議改用 `/plan-writer` + `/implement`。
-- 人工關卡不可跳過。
+- 若釐清後判斷為操作問題而非 bug，輸出說明並停止，不進行任何修復或分支建立。
+- 修復前必須先建立符合命名規則的分支，不可在預設分支（main/master/develop）上直接修復。
+- 測試撰寫由 agent 自行驗證，無人工關卡，驗證不過就重試直到通過為止。
 - `.test-baseline` 驗證不可跳過。
-- 覆蓋率與測試失敗的 retry 上限共用同一計數器。
+- 覆蓋率與測試失敗的 retry 上限共用同一計數器（僅限步驟 6 的實作 retry）。
+- Ticket 若有母票或評論，均須納入問題理解，不可忽略。
+- 實作完成後必須建立 PR 或 MR，不可僅推送分支後停止。
 
 ## 錯誤處理
 
