@@ -1,7 +1,7 @@
 ---
 name: bugfix
 description: 自動化 bug 修復流程。理解症狀 → 形成可偽造假設 → 以 reproduction test 驗證假設 → 修復 → Code Review → MR。適用於症狀已知的 bug（生產環境緊急、QA 驗收票）。需要設計新 API 或不確定修法，請改用 /plan-writer。
-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
+tools: ["Read", "Write", "Bash", "Glob", "Grep", "AskUserQuestion"]
 ---
 
 # Bugfix — 完整自動化 Bug 修復流程

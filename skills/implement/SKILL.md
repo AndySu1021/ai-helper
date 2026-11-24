@@ -1,7 +1,7 @@
 ---
 name: implement
 description: TDD 實作流程。test-writer agent 先撰寫失敗測試，人工確認後 implementer agent 寫實作，直到所有測試通過。test-writer 與 implementer 分開執行，測試檔案不可被 implementer 修改。
-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
+tools: ["Read", "Write", "Bash", "Glob", "Grep", "AskUserQuestion"]
 ---
 
 # Implement — TDD 實作

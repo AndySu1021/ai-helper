@@ -1,7 +1,7 @@
 ---
 name: pipeline
 description: 自動化單張 ticket 的完整開發流程：建立 git worktree 隔離實作環境，plan（多 agent 並行審查）→ implement（test-reviewer 預審）→ smoke-test（Docker + curl/Postman）→ code-review + security-scan → gitlab-mr。Feature branch 從 release/<fix_version> checkout，不影響本地工作目錄。
-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
+tools: ["Read", "Write", "Bash", "Glob", "Grep", "AskUserQuestion"]
 ---
 
 # Pipeline — 全自動開發流程
@@ -175,6 +175,8 @@ implementer 重試超過 3 次仍無法通過 → 停止（`blocked-impl`），�
 
 ### 階段 C：Smoke Test
 
+**進入前驗證**：讀取 `tmp/${TICKET_ID}/.worktree`，取得 `WORKTREE_PATH`、`FEATURE_BRANCH`、`BASE_BRANCH`。確認 `path:` 欄位的目錄存在，否則立即停止（`❌ worktree 不存在，請重新執行 pipeline`）。
+
 依照 **smoke-test** skill（`skills/smoke-test/SKILL.md`）完整流程執行，傳入：
 - `working_dir: ${WORKTREE_PATH}`
 
@@ -189,6 +191,8 @@ implementer 重試超過 3 次仍無法通過 → 停止（`blocked-impl`），�
 ---
 
 ### 階段 D：Code Review + Security Scan（並行）
+
+**進入前驗證**：讀取 `tmp/${TICKET_ID}/.worktree`，取得 `WORKTREE_PATH`、`FEATURE_BRANCH`、`BASE_BRANCH`。確認 `path:` 欄位的目錄存在，否則立即停止（`❌ worktree 不存在，請重新執行 pipeline`）。
 
 依照 **code-review** skill 與 **security-scan** skill 完整流程執行，diff 來源：
 
@@ -230,6 +234,8 @@ fi
 
 ### 階段 E：建立 MR
 
+**進入前驗證**：讀取 `tmp/${TICKET_ID}/.worktree`，取得 `WORKTREE_PATH`、`FEATURE_BRANCH`、`BASE_BRANCH`。確認 `path:` 欄位的目錄存在，否則立即停止（`❌ worktree 不存在，請重新執行 pipeline`）。
+
 ```bash
 git -C "${WORKTREE_PATH}" push -u origin "${FEATURE_BRANCH}"
 ```
@@ -245,7 +251,7 @@ MR 標題格式：直接使用 `${FEATURE_BRANCH}`（分支名稱）。
 
 ## 步驟 3：清理與完成
 
-MR 建立成功後移除 worktree：
+MR 建立成功後，讀取 `tmp/${TICKET_ID}/.worktree` 取得 `WORKTREE_PATH`，移除 worktree：
 
 ```bash
 git worktree remove "${WORKTREE_PATH}" --force

@@ -1,7 +1,7 @@
 ---
 name: review-mr
 description: 審查外部 MR/PR。取得 diff 後偵測 Jira ticket 或需求文件，呼叫 code-review 與 security-scan，並驗證實作是否滿足需求，合併結果寫入 tmp/mr-review/<編號>.md。不發佈評論至 MR/PR，僅保留本地報告。
-tools: ["Read", "Write", "Bash", "AskUserQuestion"]
+tools: ["Read", "Write", "Bash", "Glob", "Grep", "AskUserQuestion"]
 ---
 
 # MR Review — 外部 MR/PR 審查

@@ -1,7 +1,7 @@
 ---
 name: code-review
 description: 審查 git diff，驗證是否符合 Ticket 需求，依預設規則與專案自訂規則產出 tmp/<ticket-id>/review.md。每個問題標示等級（blocker/warning/nit）、檔案、行號、說明與修正建議。reviewer 完全唯讀，不得修改程式碼。
-tools: ["Read", "Bash", "Glob"]
+tools: ["Read", "Bash", "Glob", "Grep"]
 ---
 
 # Code Review — 程式碼審查

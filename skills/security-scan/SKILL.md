@@ -1,7 +1,7 @@
 ---
 name: security-scan
 description: 執行靜態分析工具（gitleaks、semgrep、依語言的依賴掃描）並以 security-auditor agent 進行語意判斷，輸出至 tmp/<ticket-id>/security.md。報告中禁止顯示敏感值。security-auditor 完全唯讀。
-tools: ["Read", "Bash", "Glob"]
+tools: ["Read", "Bash", "Glob", "Grep"]
 ---
 
 # Security Scan — 安全掃描
