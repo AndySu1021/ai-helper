@@ -8,13 +8,13 @@ source: ""
 # 安全掃描報告
 
 掃描工具：gitleaks, semgrep, govulncheck
-發現問題：X blocker, X warning
+發現問題：X 個阻擋項，X 個警告
 
 ---
 
-## Blocker（必須修正）
+## 阻擋項（必須修正）
 
-### [blocker] <問題類型>
+### [阻擋] <問題類型>
 
 **位置**：`<檔案>:<行號>`
 **類型**：<敏感資訊洩漏 / SQL injection / ...>
@@ -23,9 +23,9 @@ source: ""
 
 ---
 
-## Warning（建議修正）
+## 警告（建議修正）
 
-### [warning] <問題類型>
+### [警告] <問題類型>
 
 **位置**：`<檔案>:<行號>`
 **說明**：<問題說明>
@@ -45,4 +45,4 @@ source: ""
 
 ## 審查結論
 
-**裁定：APPROVE / REQUEST CHANGES**
+**裁定：通過 / 需修正**

@@ -10,14 +10,11 @@ context: fork
 ## 輸入
 
 從呼叫方取得：
-- 測試路徑 glob（由呼叫方的語言推斷傳入）
-- 實作路徑 glob（由呼叫方的語言推斷傳入）
 - `tmp/<ticket-id>/schema.md` — API schema
 - `tmp/<ticket-id>/plan.md` — 實作計畫
-- ticket-id
-- 測試指令（`commands.test`，由呼叫方語言推斷傳入）
+- ticket-id（由呼叫方明確傳入）
 
-讀取 ticket-id：`cat tmp/.current-ticket`
+固定設定：`paths.test = **/*_test.go`、`paths.impl = **/*.go`（排除 `*_test.go`）、`commands.test = go test ./...`
 
 ## 步驟 1：讀取輸入
 
@@ -95,46 +92,30 @@ context: fork
 
 ## 步驟 7：執行覆蓋率檢查
 
-依語言執行覆蓋率測試：
-
-**Go**：
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
 go test -coverprofile="tmp/${TICKET_ID}/.coverage.out" ./...
 COVERAGE=$(go tool cover -func="tmp/${TICKET_ID}/.coverage.out" | grep "^total:" | awk '{print $3}')
 echo "Coverage: ${COVERAGE}"
 ```
-
-**TypeScript/JavaScript（jest）**：
-```bash
-jest --coverage --coverageReporters=text-summary 2>&1 | grep "All files"
-```
-
-**Python（pytest-cov）**：
-```bash
-pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
-```
-
-若工具不支援，在 HANDOFF 中標示 `coverage: N/A`。
 
 ## 步驟 8：回傳結果
 
 輸出以下格式的交接資訊：
 
 ```
-## HANDOFF: implementer → code-review/security-scan
+## 交接：implementer → code-review/security-scan
 
-### Context
+### 實作摘要
 <簡述實作了什麼>
 
-### Files Modified
+### 異動檔案
 <修改的檔案清單>
 
-### Test Results
+### 測試結果
 通過：X / 共 Y 個測試
-coverage: <X% 或 N/A>
+覆蓋率：<X% 或 N/A>
 
-### Open Issues
+### 待處理問題
 <若有任何未解決的問題>
 ```
 
@@ -144,3 +125,6 @@ coverage: <X% 或 N/A>
 - **禁止刪除、跳過或標記忽略任何測試**（`t.Skip`、`// nolint` 用於跳過測試屬違規）。
 - 測試失敗且判斷是測試問題時，必須停止並回報，不可自行修改測試。
 - 只寫讓測試通過的最少量程式碼，不預先為未來需求設計介面。
+- **搜尋檔案或內容時，優先使用 `Glob`（找檔案）與 `Grep`（搜文字）工具；若必須用 bash，使用 `grep -rl` 或 pipe（`find ... | xargs grep`），禁止 `find -exec`。**
+- **禁止使用 `cat -A`、`cat file | sed`、`cat file | grep` 等 pipe 指令**；需要讀取特定行範圍時，使用 `Read` 工具並指定 offset/limit。
+- **禁止 `cd <path> && git`**；需要在指定目錄執行 git 時，使用 `git -C <path>`。

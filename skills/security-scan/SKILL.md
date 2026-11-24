@@ -11,7 +11,7 @@ tools: ["Read", "Bash", "Glob"]
 ## 使用方式
 
 ```
-/security-scan
+/security-scan <ticket-id>
 ```
 
 ---
@@ -19,32 +19,48 @@ tools: ["Read", "Bash", "Glob"]
 ## 步驟 0：讀取 ticket-id
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
 輸出路徑為 `tmp/${TICKET_ID}/security.md`。
 
 ---
 
-## 步驟 1：推斷語言與掃描工具
+## 步驟 1：掃描工具設定
+
+固定設定：
+- 依賴掃描：`govulncheck ./...`
+- semgrep 規則集：`p/golang`、`p/security-audit`
+
+**必要工具安裝確認**（執行掃描前）：
 
 ```bash
-[ -f go.mod ]           && LANG=go
-[ -f package.json ]     && LANG=node
-[ -f requirements.txt ] && LANG=python
-[ -f Cargo.toml ]       && LANG=rust
+MISSING_TOOLS=""
+command -v gitleaks >/dev/null 2>&1 || MISSING_TOOLS="${MISSING_TOOLS} gitleaks"
+command -v semgrep  >/dev/null 2>&1 || MISSING_TOOLS="${MISSING_TOOLS} semgrep"
 ```
 
-依語言決定預設依賴掃描指令：
+若 `MISSING_TOOLS` 不為空，**立即停止**並顯示以下訊息，不可繼續執行：
 
-| 語言 | 依賴掃描指令 | semgrep 規則集 |
-|------|------------|--------------|
-| go | `govulncheck ./...` | `p/golang` |
-| node | `npm audit --json` | `p/javascript` |
-| python | `pip-audit` | `p/python` |
-| rust | `cargo audit` | `p/rust` |
+```
+❌ 安全掃描無法執行：必要工具未安裝
 
-所有語言均額外執行 `p/security-audit`（通用安全規則）。
+以下工具為必要工具，請安裝完成後重新執行 /security-scan：
+
+  gitleaks：brew install gitleaks
+            https://github.com/gitleaks/gitleaks
+
+  semgrep ：brew install semgrep
+            https://semgrep.dev/docs/getting-started
+
+安裝完成後請重新執行：/security-scan <ticket-id>
+```
+
+停止，不執行步驟 2 以後的任何動作。
 
 ---
 
@@ -70,10 +86,13 @@ bash skills/security-scan/scripts/run-scanners.sh
 
 ## 步驟 2.5：大型 diff 判斷
 
+若呼叫方傳入 `working_dir`，所有 git 指令加上 `-C "${WORKING_DIR}"`；否則在當前目錄執行。
+
 ```bash
-BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
-CHANGED_FILES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
-CHANGED_LINES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
+GIT="git -C ${WORKING_DIR:-.}"
+BASE_BRANCH=$(${GIT} symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
+CHANGED_FILES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
+CHANGED_LINES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
 ```
 
 - 若 `CHANGED_FILES > 30` 或 `CHANGED_LINES > 1000`：啟動**分批語意審查**（見下方）
@@ -114,7 +133,7 @@ security-auditor 負責：
 ```markdown
 ---
 stage: security
-status: <若有任何 blocker 則為 blocked，否則為 passed>
+status: <若有任何 blocker 則為 blocked；所有工具完整執行且無 blocker 則為 passed>
 created: <YYYY-MM-DD>
 source: <繼承自 plan.md 的 source，若有>
 ---
@@ -123,13 +142,13 @@ source: <繼承自 plan.md 的 source，若有>
 
 掃描工具：<已執行的工具清單>
 工具版本：<各工具版本>
-發現問題：X blocker, X warning
+發現問題：X 個阻擋項，X 個警告
 
 ---
 
-## Blocker（必須修正）
+## 阻擋項（必須修正）
 
-### [blocker] <問題類型>
+### [阻擋] <問題類型>
 **位置**：`<檔案>:<行號>`
 **類型**：<敏感資訊洩漏 / SQL injection / ...>
 **說明**：<問題說明，不得顯示敏感值本身>
@@ -137,9 +156,9 @@ source: <繼承自 plan.md 的 source，若有>
 
 ---
 
-## Warning（建議修正）
+## 警告（建議修正）
 
-### [warning] <問題類型>
+### [警告] <問題類型>
 **位置**：`<檔案>:<行號>`
 **說明**：<問題說明>
 **建議修正**：<具體做法>
@@ -150,15 +169,15 @@ source: <繼承自 plan.md 的 source，若有>
 
 | 工具 | 狀態 | 發現數 |
 |-----|------|--------|
-| gitleaks | 已執行 / 未安裝 | X |
-| semgrep | 已執行 / 未安裝 | X |
+| gitleaks | 已執行 | X |
+| semgrep | 已執行 | X |
 | <依賴掃描> | 已執行 / 未安裝 | X |
 
 ---
 
 ## 審查結論
 
-**裁定：APPROVE / REQUEST CHANGES**
+**裁定：通過 / 需修正**
 ```
 
 ---

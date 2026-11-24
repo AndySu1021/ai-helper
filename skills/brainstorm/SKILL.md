@@ -11,7 +11,7 @@ tools: ["Read", "Write", "Glob", "Grep", "AskUserQuestion"]
 ## 使用方式
 
 ```
-/brainstorm
+/brainstorm <ticket-id>
 ```
 
 ---
@@ -19,7 +19,11 @@ tools: ["Read", "Write", "Glob", "Grep", "AskUserQuestion"]
 ## 步驟 0：讀取 ticket-id
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
 輸出路徑為 `tmp/${TICKET_ID}/requirements.md`。
@@ -40,7 +44,7 @@ TICKET_ID=$(cat tmp/.current-ticket)
 
 > 請描述你想實作的功能或需要解決的問題。若有 Jira ticket 或 Confluence 文件，也請一併提供。
 
-收到描述後，逐一確認以下問題（有不清楚的就問，不可自行假設）：
+收到描述後，先從描述中**自動推斷**以下六個維度，能推斷的直接填入（標記 `(自動推斷)`），無法確定的才提問：
 
 1. **目標**：這個功能要達到什麼目的？成功的標準是什麼？
 2. **範圍**：哪些東西包含在這次實作內？哪些明確排除？
@@ -49,7 +53,7 @@ TICKET_ID=$(cat tmp/.current-ticket)
 5. **相依性**：是否依賴其他系統或服務？（API、資料庫、第三方服務）
 6. **限制**：有效能、安全、法規或時程的限制嗎？
 
-**必須遵守**：若上述問題中有任何無法從使用者回應得到明確答案的，以條列方式列出「待確認項目」，並再次詢問，不可跳過。
+**必須遵守**：只對真正無法從描述推斷的維度提問，不可批量詢問全部六個問題。自動推斷的維度在最終摘要中標示 `(自動推斷)`，讓使用者可以快速掃描並只針對標注項目確認或修正。
 
 ---
 
@@ -102,13 +106,17 @@ TICKET_ID=$(cat tmp/.current-ticket)
 確認內容正確嗎？若有需要修正的地方請說明。
 ```
 
-確認後，將摘要**寫入 `tmp/${TICKET_ID}/requirements.md`**：
+確認後，**寫入前先驗證摘要包含所有必要區段**（目標、範圍內、邊界條件），若有任何區段空白或僅有「待確認」佔位符，停止並要求使用者補齊後再寫入。
+
+驗證通過後，將摘要**寫入 `tmp/${TICKET_ID}/requirements.md`**：
 
 ```markdown
 ---
 stage: requirements
 status: confirmed
 created: <YYYY-MM-DD>
+fix_version: <fix version，例 v1.2.0；若無則留空>
+complexity: <low | medium | high>
 source: <Jira 連結或 Confluence 連結，若無則留空>
 ---
 

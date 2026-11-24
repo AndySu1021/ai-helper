@@ -11,7 +11,7 @@ tools: ["Read", "Write", "Glob", "Grep"]
 ## 使用方式
 
 ```
-/api-schema
+/api-schema <ticket-id>
 ```
 
 ---
@@ -19,7 +19,11 @@ tools: ["Read", "Write", "Glob", "Grep"]
 ## 步驟 0：讀取 ticket-id
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
 輸出路徑為 `tmp/${TICKET_ID}/schema.md`。
@@ -108,14 +112,7 @@ Request body（若有）：
 <說明此端點是否為新增，或修改既有端點。若修改，說明向後相容策略。>
 ```
 
-完成後輸出：
-
-```
-tmp/<ticket-id>/schema.md 已產生。
-
-建議後續步驟：
-  /implement        進入 TDD 實作
-```
+完成後輸出：`tmp/<ticket-id>/schema.md 已產生。`
 
 ---
 

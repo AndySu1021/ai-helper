@@ -1,5 +1,5 @@
 ---
-name: mr-review
+name: review-mr
 description: 審查外部 MR/PR。取得 diff 後偵測 Jira ticket 或需求文件，呼叫 code-review 與 security-scan，並驗證實作是否滿足需求，合併結果寫入 tmp/mr-review/<編號>.md。不發佈評論至 MR/PR，僅保留本地報告。
 tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 ---
@@ -133,37 +133,18 @@ MR/PR 摘要
 
 ## 步驟 4：執行審查
 
-**呼叫子 skill 前，先隔離 ticket 狀態**，防止覆蓋進行中的 feature 開發報告：
-
 ```bash
-# 儲存目前 ticket-id（若存在）
-PREV_TICKET=""
-if [ -f tmp/.current-ticket ]; then
-  PREV_TICKET=$(cat tmp/.current-ticket)
-fi
-
-# 以 mr-<編號> 作為隔離用的臨時 ticket-id
+# 以 mr-<編號> 作為隔離用的 ticket-id，與其他進行中的票互不干擾
 MR_TICKET_ID="mr-${MR_ID}"
 mkdir -p "tmp/${MR_TICKET_ID}"
-printf '%s' "${MR_TICKET_ID}" > tmp/.current-ticket
 ```
 
 在暫存分支或直接使用 diff 內容，**同時**呼叫：
-- **code-review** skill（傳入 diff 內容）
-- **security-scan** skill（傳入 diff 內容）
-
-審查完成後，**立即恢復 ticket 狀態**：
-
-```bash
-if [ -n "$PREV_TICKET" ]; then
-  printf '%s' "${PREV_TICKET}" > tmp/.current-ticket
-else
-  rm -f tmp/.current-ticket
-fi
-```
+- `/code-review ${MR_TICKET_ID}`（傳入 diff 內容）
+- `/security-scan ${MR_TICKET_ID}`（傳入 diff 內容）
 
 > code-review 與 security-scan 的輸出會寫入 `tmp/mr-<MR_ID>/review.md` 與 `tmp/mr-<MR_ID>/security.md`。
-> 步驟 5 合併結果時從此路徑讀取，而非 `tmp/<原始 ticket-id>/`。
+> 步驟 5 合併結果時從此路徑讀取。
 
 ---
 
@@ -243,26 +224,35 @@ tickets: <PROJ-123, PROJ-456 或 none>
 
 ---
 
-## Blocker（必須修正後才能 merge）
+## 阻擋項（必須修正後才能 merge）
 
-<合併 code-review、security-scan 與需求符合度的 blocker 結果>
+<合併 code-review、security-scan 與需求符合度的阻擋項結果>
 
-## Warning（建議修正）
+## 警告（建議修正）
 
-<合併 warning 結果>
+<合併警告結果>
 
-## Nit（次要建議）
+## 建議（次要）
 
-<合併 nit 結果>
+<合併建議結果>
+
+---
+
+## Coding Style
+
+> 參考來源：<CLAUDE.md / .pipeline/style_guide.md / 既有程式碼推斷>
+
+<從 code-review 報告的 Coding Style 區段複製>
 
 ---
 
 ## 審查結論
 
-**裁定：APPROVE / REQUEST CHANGES**
-**Code Review**：<通過 / X 個 blocker>
-**Security Scan**：<通過 / X 個 blocker>
+**裁定：通過 / 需修正**
+**程式碼審查**：<通過 / X 個阻擋項>
+**安全掃描**：<通過 / X 個阻擋項>
 **需求符合度**：<通過 / X 條未滿足 / 略過>
+**Coding Style**：<一致 / X 項不符合團隊規範>
 ```
 
 ---
@@ -273,5 +263,5 @@ tickets: <PROJ-123, PROJ-456 或 none>
 - 若 `glab` 或 `gh` 未登入，停止並提示使用者登入，不可繼續。
 - diff 若超出單次 context 範圍，分批審查並在報告中標示。
 - 需求來源擷取失敗時**不可中止流程**，降級為略過需求符合度檢查並在報告中說明原因。
-- 需求符合度的 blocker 與 code-review/security-scan 的 blocker **同等權重**，皆會導致裁定為 REQUEST CHANGES。
+- 需求符合度的阻擋項與 code-review/security-scan 的阻擋項**同等權重**，皆會導致裁定為「需修正」。
 - 若同一 MR 關聯多個 ticket，每個 ticket 各自產生一份需求符合度表格。

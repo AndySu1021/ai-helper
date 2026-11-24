@@ -11,30 +11,27 @@ ai-helper/
 ├── .claude-plugin/
 │   └── plugin.json          # Plugin manifest
 ├── skills/
+│   ├── pipeline/            # 全自動流程編排（plan → implement → smoke → review → MR）
 │   ├── brainstorm/          # 需求討論
 │   ├── plan-writer/         # 實作計畫撰寫
 │   ├── api-schema/          # API schema 設計（按需要執行）
 │   ├── implement/           # TDD 實作（test-writer + implementer）
+│   ├── smoke-test/          # 本地 Docker + seed 資料 + curl/Postman 驗 API
 │   ├── bugfix/              # Bug 修復（跳過計畫階段）
+│   ├── refactor/            # Go 程式碼重構（不改變外部行為）
 │   ├── code-review/         # 程式碼審查
 │   │   └── checklist.md     # 預設審查規則
 │   ├── security-scan/       # 安全掃描
 │   │   └── scripts/         # 掃描工具腳本
-│   ├── mr-review/           # 外部 MR/PR 審查
+│   ├── review-mr/           # 外部 MR/PR 審查
 │   ├── gitlab-mr/           # 建立 GitLab MR
 │   └── release-tag/         # 打 release tag
 ├── agents/
 │   ├── test-writer.md       # TDD Red 階段
+│   ├── test-reviewer.md     # 測試語意預審（決定是否需人工介入）
 │   ├── implementer.md       # TDD Green 階段
 │   ├── reviewer.md          # 程式碼審查執行
 │   └── security-auditor.md  # 安全語意判斷
-├── commands/
-│   ├── feature.md           # /feature：流程參考卡
-│   ├── implement.md         # /implement：TDD 實作
-│   ├── bugfix.md            # /bugfix：Bug 修復
-│   ├── review-mr.md         # /review-mr：審查外部 MR
-│   ├── security-scan.md     # /security-scan：安全掃描
-│   └── release-tag.md       # /release-tag：打 tag
 ├── templates/               # 交接檔格式範本
 └── config/
     └── settings.example.json  # Claude Code agent 權限設定範例
@@ -58,15 +55,19 @@ claude --plugin-dir /path/to/ai-helper
 ### 指令
 
 ```
-/brainstorm                        # 釐清需求，找出衝突與模糊地帶
-/plan-writer                       # 制定實作計畫
-/api-schema                        # 設計 API schema（按需要執行）
-/implement                         # TDD 實作（test-writer → 人工確認 → implementer）
+/pipeline <ticket-id>              # 全自動流程（單張）：plan → implement → smoke-test → review → MR
+
+/brainstorm <ticket-id>            # 釐清需求，找出衝突與模糊地帶
+/plan-writer <ticket-id>           # 制定實作計畫（單 agent）
+/api-schema <ticket-id>            # 設計 API schema（按需要執行）
+/implement <ticket-id>             # TDD 實作（test-writer → 人工確認 → implementer）
+/smoke-test <ticket-id>            # 本地 Docker 啟動服務 + seed 資料 + curl/Postman 驗 API
 /bugfix <問題描述或 ticket 號碼>    # Bug 修復（跳過計畫階段）
-/code-review                       # 程式碼審查（需求符合度 + coding style）
-/security-scan                     # 安全掃描
-/review-mr <MR 編號或連結>          # 審查外部 MR/PR
-/gitlab-mr                         # 建立 GitLab MR
+/refactor <目標檔案或描述>          # Go 程式碼重構（不改變外部行為）
+/code-review <ticket-id>           # 程式碼審查（需求符合度 + coding style）
+/security-scan <ticket-id>         # 安全掃描
+/review-mr <MR 編號或連結>          # 審查外部 MR/PR（原 /mr-review）
+/gitlab-mr <ticket-id>             # 建立 GitLab MR
 /release-tag                       # 打 release tag
 
 /feature                           # 顯示完整流程參考卡

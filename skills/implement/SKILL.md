@@ -11,41 +11,41 @@ tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 ## 使用方式
 
 ```
-/implement
+/implement <ticket-id>
 ```
 
 執行前，`tmp/<ticket-id>/plan.md` 必須已存在。
 
 ---
 
-## 步驟 0：讀取 ticket-id 與推斷專案設定
+## 步驟 0：讀取 ticket-id 與專案設定
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
-依以下順序推斷專案語言與測試指令：
+固定設定值：
+
+| 設定 | 值 |
+|------|---|
+| `commands.test` | `go test ./...` |
+| `paths.test` | `**/*_test.go` |
+| `paths.impl` | `**/*.go`（排除 `*_test.go`）|
+| `min_coverage` | 80%（預設；可由 plan.md frontmatter 的 `min_coverage` 覆蓋） |
+| `max_impl_retry` | 3 |
+
+讀取 `min_coverage` 覆蓋邏輯：
 
 ```bash
-# 偵測語言
-[ -f go.mod ]           && LANG=go
-[ -f package.json ]     && LANG=node
-[ -f requirements.txt ] && LANG=python
-[ -f Cargo.toml ]       && LANG=rust
+PLAN_COVERAGE=$(grep '^min_coverage:' "tmp/${TICKET_ID}/plan.md" 2>/dev/null | awk '{print $2}')
+IS_BUGFIX=$(grep '^bugfix:' "tmp/${TICKET_ID}/plan.md" 2>/dev/null | awk '{print $2}')
+MIN_COVERAGE=${PLAN_COVERAGE:-80}
+[ "${IS_BUGFIX}" = "true" ] && [ -z "${PLAN_COVERAGE}" ] && MIN_COVERAGE=60
 ```
-
-| 語言 | `commands.test` 預設 | `paths.test` 預設 | `paths.impl` 預設 |
-|------|---------------------|-------------------|-------------------|
-| go | `go test ./...` | `**/*_test.go` | `**/*.go`（排除 `*_test.go`）|
-| node | `npm test` | `**/*.test.ts`, `**/*.spec.ts`, `**/*.test.js` | `src/**` |
-| python | `pytest` | `tests/**`, `**/*_test.py` | 排除 tests 以外 |
-| rust | `cargo test` | `**/tests/**`, `src/**` (含 `#[cfg(test)]`) | `src/**` |
-
-若語言無法推斷，使用 `AskUserQuestion` 詢問：「無法自動偵測專案語言，請告知：1) 語言 2) 測試指令 3) 測試檔路徑規則。」
-
-固定預設值（不可由外部覆蓋）：
-- `min_coverage`：80%
-- `max_impl_retry`：3
 
 ---
 
@@ -71,9 +71,31 @@ git rev-parse HEAD > "tmp/${TICKET_ID}/.test-baseline"
 - ticket-id
 - 步驟 0 推斷的 `paths.test`、`commands.test`
 
-test-writer 完成後確認 `tmp/${TICKET_ID}/test-report.md` 已產生。
+test-writer 完成後執行以下驗證：
 
-**【人工關卡】** — 顯示：
+```bash
+# 1. 確認 test-report.md 已產生
+[ -f "tmp/${TICKET_ID}/test-report.md" ] || { echo "ERROR: test-report.md 未產生"; exit 1; }
+
+# 2. 確認有實際的測試檔案被寫入（相較基準點有新增或修改）
+TEST_BASELINE=$(cat "tmp/${TICKET_ID}/.test-baseline")
+CHANGED_TEST_FILES=$(git diff --name-only "${TEST_BASELINE}" -- <paths.test glob>)
+if [ -z "${CHANGED_TEST_FILES}" ]; then
+  echo "ERROR: test-writer 未產生任何測試檔案。請重新執行 test-writer agent。"
+  exit 1
+fi
+echo "測試檔案已產生：${CHANGED_TEST_FILES}"
+```
+
+若驗證失敗，重新執行 test-writer agent，要求明確建立測試檔案。
+
+**test-reviewer 預審**：
+
+以 **test-reviewer** agent 執行，傳入 ticket-id、`paths.test`。等待 test-reviewer 寫入 `tmp/${TICKET_ID}/test-review.md`，讀取 `verdict`：
+
+**`verdict: auto`** → 直接進入實作，不詢問使用者。
+
+**`verdict: human`** → 顯示人工關卡：
 
 ```
 ══════════════════════════════════
@@ -82,6 +104,7 @@ test-writer 完成後確認 `tmp/${TICKET_ID}/test-report.md` 已產生。
 測試撰寫完成，請審閱：
 
 tmp/<ticket-id>/test-report.md
+tmp/<ticket-id>/test-review.md（審查建議）
 
 確認以下事項：
 - 測試案例是否涵蓋 plan.md 中所有需求
@@ -92,7 +115,7 @@ tmp/<ticket-id>/test-report.md
 ══════════════════════════════════
 ```
 
-使用 `AskUserQuestion` 等待確認。若使用者要求調整，重新執行 test-writer agent。
+使用 `AskUserQuestion` 等待確認。若使用者要求調整，重新執行 test-writer agent（最多 2 次，仍需人工確認後再繼續）。
 
 ---
 
@@ -126,28 +149,30 @@ git diff --name-only "${TEST_BASELINE}" -- <paths.test glob>
 
 ## 步驟 5：覆蓋率驗證
 
-依語言執行覆蓋率檢查：
+針對本次變更的 package 計算覆蓋率（避免被既有高覆蓋率稀釋）：
 
 ```bash
-# Go
-go test -coverprofile="tmp/${TICKET_ID}/.coverage.out" ./...
-go tool cover -func="tmp/${TICKET_ID}/.coverage.out" | grep "^total:" | awk '{print $3}'
+# 推斷本次變更涉及的 packages
+CHANGED_PACKAGES=$(git diff --name-only HEAD~1 2>/dev/null || git diff --cached --name-only \
+  | grep '\.go$' | grep -v '_test\.go$' \
+  | xargs -I{} dirname {} | sort -u | sed 's|^|./|' | tr '\n' ',' | sed 's/,$//')
 
-# TypeScript/JavaScript（jest）
-jest --coverage --coverageReporters=text-summary 2>&1 | grep "All files"
+# 若無法推斷（例如首次 commit），fallback 為全專案
+[ -z "${CHANGED_PACKAGES}" ] && CHANGED_PACKAGES="./..."
 
-# Python
-pytest --cov --cov-report=term-missing 2>&1 | grep "^TOTAL"
+go test -coverprofile="tmp/${TICKET_ID}/.coverage.out" -coverpkg="${CHANGED_PACKAGES}" ./...
+COVERAGE=$(go tool cover -func="tmp/${TICKET_ID}/.coverage.out" | grep "^total:" | awk '{print $3}' | tr -d '%')
+
+# 寫入覆蓋率基準值供 pipeline 修復循環使用
+echo "${COVERAGE}" > "tmp/${TICKET_ID}/.coverage-baseline"
 ```
-
-若工具不支援覆蓋率，顯示警告「無法取得覆蓋率數據」並繼續（不阻擋流程）。
 
 **計數器**：`impl_retry_count`（初始為 0）
 
 若覆蓋率 < `min_coverage`：
 - `impl_retry_count += 1`
 - 若 `impl_retry_count >= max_impl_retry`：停止，提示人工介入。
-- 否則顯示：「測試覆蓋率不足（目前 X%，要求 ≥ N%），請補充測試後重新實作。」，回到步驟 2 人工關卡。
+- 否則顯示：「測試覆蓋率不足（目前 X%，要求 ≥ N%），請補充測試後重新實作。」，回到步驟 2 test-reviewer 預審。
 
 若測試失敗（非覆蓋率問題）：
 - `impl_retry_count += 1`

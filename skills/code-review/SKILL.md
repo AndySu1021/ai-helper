@@ -11,7 +11,7 @@ tools: ["Read", "Bash", "Glob"]
 ## 使用方式
 
 ```
-/code-review
+/code-review <ticket-id>
 ```
 
 ---
@@ -19,7 +19,11 @@ tools: ["Read", "Bash", "Glob"]
 ## 步驟 0：讀取 ticket-id
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
 輸出路徑為 `tmp/${TICKET_ID}/review.md`。
@@ -39,18 +43,24 @@ TICKET_ID=$(cat tmp/.current-ticket)
 
 ## 步驟 1：取得 diff
 
+若呼叫方傳入 `working_dir`，所有 git 指令加上 `-C "${WORKING_DIR}"`；否則在當前目錄執行。
+
 ```bash
+# WORKING_DIR 由呼叫方傳入（pipeline worktree 情境），未傳入時為 "."
+GIT="git -C ${WORKING_DIR:-.}"
+
 # 推斷 base branch：優先從 remote HEAD 取，fallback 為 main
-BASE_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
-git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only
-git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat
+BASE_BRANCH=$(${GIT} symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||' || echo "main")
+
+${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only
+${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat
 ```
 
 **大型 diff 判斷**（取得 name-only 與 stat 後執行）：
 
 ```bash
-CHANGED_FILES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
-CHANGED_LINES=$(git diff $(git merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
+CHANGED_FILES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --name-only | wc -l)
+CHANGED_LINES=$(${GIT} diff $(${GIT} merge-base HEAD origin/${BASE_BRANCH})...HEAD --stat | tail -1 | awk '{print $4+$6}')
 ```
 
 - 若 `CHANGED_FILES > 30` 或 `CHANGED_LINES > 1000`：啟動**分批審查模式**（見步驟 1.5）
@@ -105,9 +115,13 @@ Coding style 驗證重點：
 
 ---
 
-## 步驟 3：讀取完整檔案內容
+## 步驟 3：讀取檔案上下文
 
-對每個變更檔案，使用 `Read` 讀取完整內容（非只看 diff），以取得完整上下文。
+對每個變更檔案，採用漸進策略取得上下文：
+
+1. 以 `git diff -U50` 取得 diff 片段與前後各 50 行的上下文
+2. 若涉及介面定義、型別宣告、全域常數、init 函式等需要整體脈絡的情形，才使用 `Read` 讀取完整檔案
+
 （分批模式下：每批分別執行此步驟，僅讀取該批次的檔案。）
 
 ---
@@ -132,10 +146,18 @@ Coding style 驗證重點：
 
 ## 步驟 5：程式碼審查
 
-依照審查規則逐項檢查每個變更，將發現記錄為以下格式：
+依照審查規則逐項檢查每個變更。
+
+**提出問題前，必須先確認問題確實存在**：
+- 引用觸發問題的具體程式碼片段（行號 + 內容）
+- 說明為何這段程式碼有問題（邏輯推導或測試路徑）
+- 若無法從程式碼直接確認，不得提出該問題
+
+每個發現記錄為以下格式：
 
 ```
 [等級] 檔案路徑:行號 — 問題說明
+證明：<觸發此問題的具體程式碼或情境>
 建議：<具體修正方式>
 ```
 
@@ -163,7 +185,7 @@ source: <繼承自 plan.md 的 source，若有>
 審查範圍：<base_branch>...HEAD
 檢查規則：<預設規則 / 預設 + 專案自訂 / 專案自訂>
 變更檔案數：X
-發現問題：X blocker, X warning, X nit
+發現問題：X 個阻擋項，X 個警告，X 個建議
 
 ---
 
@@ -180,27 +202,27 @@ source: <繼承自 plan.md 的 source，若有>
 
 ---
 
-## Blocker（必須修正）
+## 阻擋項（必須修正）
 
-### [blocker] <檔案>:<行號> — <問題標題>
+### [阻擋] <檔案>:<行號> — <問題標題>
 <問題說明>
 
 **建議修正**：<具體做法>
 
 ---
 
-## Warning（建議修正）
+## 警告（建議修正）
 
-### [warning] <檔案>:<行號> — <問題標題>
+### [警告] <檔案>:<行號> — <問題標題>
 <問題說明>
 
 **建議修正**：<具體做法>
 
 ---
 
-## Nit（次要建議）
+## 建議（次要）
 
-- [nit] `<檔案>:<行號>` — <說明>
+- [建議] `<檔案>:<行號>` — <說明>
 
 ---
 
@@ -217,7 +239,7 @@ source: <繼承自 plan.md 的 source，若有>
 
 ## 審查結論
 
-**裁定：APPROVE / REQUEST CHANGES**
+**裁定：通過 / 需修正**
 
 <1-2 句總結>
 ```

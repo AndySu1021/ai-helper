@@ -171,7 +171,7 @@ echo "=== 掃描完成，結果存於 $OUTPUT_DIR ==="
 ERROR_FILES=$(find "$OUTPUT_DIR" -name "*-error.txt" 2>/dev/null | wc -l | tr -d ' ')
 if [ "$ERROR_FILES" -gt 0 ]; then
   echo "⚠️  有 $ERROR_FILES 個工具執行失敗，部分結果可能不完整："
-  find "$OUTPUT_DIR" -name "*-error.txt" -exec echo "  - {}" \;
+  find "$OUTPUT_DIR" -name "*-error.txt" | while IFS= read -r f; do echo "  - $f"; done
   # 寫入統一標記供 SKILL.md 判讀
   echo "scan_error: true" > "$OUTPUT_DIR/scan-status.txt"
   echo "failed_tools: $ERROR_FILES" >> "$OUTPUT_DIR/scan-status.txt"

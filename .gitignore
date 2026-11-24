@@ -1,6 +1,7 @@
 .idea/
 .DS_Store
 .claude/settings.local.json
+tmp/
 
 # pipeline 暫存檔
 docs/.security-raw/

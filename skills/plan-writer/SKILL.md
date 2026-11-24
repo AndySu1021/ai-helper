@@ -1,7 +1,7 @@
 ---
 name: plan-writer
 description: 依需求摘要撰寫結構化實作計畫，輸出至 tmp/<ticket-id>/plan.md。計畫必須包含目標、範圍、影響檔案、API 變更、測試策略與風險。
-tools: ["Read", "Write", "Glob", "Grep", "Bash"]
+tools: ["Read", "Write", "Bash", "AskUserQuestion"]
 ---
 
 # Plan Writer — 實作計畫撰寫
@@ -11,7 +11,7 @@ tools: ["Read", "Write", "Glob", "Grep", "Bash"]
 ## 使用方式
 
 ```
-/plan-writer
+/plan-writer <ticket-id>
 ```
 
 ---
@@ -19,112 +19,71 @@ tools: ["Read", "Write", "Glob", "Grep", "Bash"]
 ## 步驟 0：讀取 ticket-id
 
 ```bash
-TICKET_ID=$(cat tmp/.current-ticket)
-```
-
-輸出路徑為 `tmp/${TICKET_ID}/plan.md`。
-
----
-
-## 步驟 1：收集輸入資訊
-
-平行讀取以下資料：
-1. `tmp/${TICKET_ID}/requirements.md` — 需求摘要（來自 brainstorm）
-2. `CLAUDE.md` — 專案規範（語言、命名慣例、錯誤處理）
-3. 相關的既有程式碼（使用 `Glob` 與 `Grep` 探索受影響的模組）
-
----
-
-## 步驟 2：分析影響範圍
-
-使用 `Grep` 和 `Glob` 找出：
-- 需要新增的檔案
-- 需要修改的既有檔案
-- 相依的模組或套件
-- 需要新增或修改的 API 端點（若適用）
-- 需要的資料庫 schema 變更（若適用）
-
----
-
-## 步驟 3：撰寫計畫
-
-將計畫寫入 `tmp/${TICKET_ID}/plan.md`，使用 `templates/plan.md` 的格式：
-
-```markdown
----
-stage: plan
-created: <YYYY-MM-DD>
-source: <需求來源，Jira 編號或 Confluence 連結>
----
-
-# 實作計畫：<功能名稱>
-
-## 目標
-
-<清楚描述這次實作要達成什麼，以及為什麼重要>
-
-## 範圍
-
-### 包含
-- <項目 1>
-- <項目 2>
-
-### 排除
-- <明確不做的事>
-
-## 影響檔案
-
-| 檔案路徑 | 變更類型 | 說明 |
-|---------|---------|------|
-| <路徑>  | 新增/修改/刪除 | <說明> |
-
-## API 變更
-
-<若無 API 變更，填寫「無」>
-
-| 端點 | 方法 | 變更說明 |
-|-----|------|---------|
-| <路徑> | GET/POST/... | <說明> |
-
-## 測試策略
-
-- **Unit test**：<需要測試的核心邏輯>
-- **Integration test**：<需要整合測試的端點或模組>
-- **邊界條件**：<需要覆蓋的邊界情境>
-
-## 風險
-
-| 風險 | 影響 | 緩解方式 |
-|-----|------|---------|
-| <風險描述> | 高/中/低 | <如何降低風險> |
-
-## 實作順序
-
-1. <步驟 1>
-2. <步驟 2>
-3. <步驟 3>
+TICKET_ID="${ARGUMENTS:-}"
+if [ -z "${TICKET_ID}" ]; then
+  # AskUserQuestion: 請提供 ticket ID（例如 PROJ-123）
+fi
+mkdir -p "tmp/${TICKET_ID}"
 ```
 
 ---
 
-## 步驟 4：確認
+## 步驟 1：前置確認
 
-輸出以下訊息：
+確認 `tmp/${TICKET_ID}/requirements.md` 存在，否則立即停止：
 
 ```
+❌ Plan Writer 無法啟動
+
+tmp/<ticket-id>/requirements.md 不存在。
+請執行 /brainstorm 或手動建立 requirements.md 後再試。
+```
+
+讀取 requirements.md 的 `complexity` 欄位：
+
+```bash
+COMPLEXITY=$(grep '^complexity:' "tmp/${TICKET_ID}/requirements.md" | awk '{print $2}' || echo "medium")
+```
+
+---
+
+## 步驟 2：執行 plan-writer agent
+
+**`complexity: low`** → 以 **plan-writer** agent 執行一次（`perspective: default`），輸出至 `tmp/${TICKET_ID}/plan.md`，直接進入步驟 3。
+
+**`complexity: medium` 或 `high`** → 並行以 **plan-writer** agent 執行三次，附加不同視角：
+
+- **Agent 1**：`perspective: default`，輸出 `tmp/${TICKET_ID}/plan-draft-1.md`
+- **Agent 2**：`perspective: critical`，輸出 `tmp/${TICKET_ID}/plan-draft-2.md`
+- **Agent 3**：`perspective: minimal`，輸出 `tmp/${TICKET_ID}/plan-draft-3.md`
+
+三份 draft 完成後整合：
+1. 以 `plan-draft-1.md` 為基礎
+2. 將 `plan-draft-2.md` 中的遺漏/潛在問題納入風險表或影響範圍
+3. 將 `plan-draft-3.md` 中標為「可 defer」的項目移入「排除」區段並備注原因
+4. 生成 `tmp/${TICKET_ID}/plan.md`，frontmatter 加入：`reviewed_by: plan-draft-1, plan-draft-2, plan-draft-3`
+
+---
+
+## 步驟 3：完成
+
+輸出：
+
+```
+══════════════════════════════════
+✅ 計畫撰寫完成
+══════════════════════════════════
 tmp/<ticket-id>/plan.md 已產生。
 
-請審閱計畫內容，若有需要調整的地方直接修改檔案即可。
-
-建議後續步驟（依需求選擇）：
-  /api-schema       設計 API schema（若有 API 新增或修改）
-  /implement        進入 TDD 實作
+建議後續步驟：
+  /api-schema <ticket-id>    設計 API schema（若有 API 變更）
+  /implement  <ticket-id>    TDD 實作
+══════════════════════════════════
 ```
 
 ---
 
 ## 規則
 
+- requirements.md 必須存在才可執行。
 - 計畫必須根據實際程式碼探索結果撰寫，不可憑空假設影響範圍。
-- 若無法確定某個影響範圍，在「風險」欄位中標示，不可略去。
-- `tmp/${TICKET_ID}/` 目錄若不存在，自動建立。
