@@ -16,6 +16,7 @@ ai-helper/
 │   ├── plan-writer/         # 實作計畫撰寫
 │   ├── api-schema/          # API schema 設計（按需要執行）
 │   ├── implement/           # TDD 實作（test-writer + implementer）
+│   ├── frontend-implement/  # React TDD 實作（frontend-test-writer + frontend-implementer）
 │   ├── smoke-test/          # 本地 Docker + seed 資料 + curl/Postman 驗 API
 │   ├── bugfix/              # Bug 修復（跳過計畫階段）
 │   ├── refactor/            # Go 程式碼重構（不改變外部行為）
@@ -27,11 +28,13 @@ ai-helper/
 │   ├── gitlab-mr/           # 建立 GitLab MR
 │   └── release-tag/         # 打 release tag
 ├── agents/
-│   ├── test-writer.md       # TDD Red 階段
-│   ├── test-reviewer.md     # 測試語意預審（決定是否需人工介入）
-│   ├── implementer.md       # TDD Green 階段
-│   ├── reviewer.md          # 程式碼審查執行
-│   └── security-auditor.md  # 安全語意判斷
+│   ├── test-writer.md              # TDD Red 階段（Go）
+│   ├── test-reviewer.md            # 測試語意預審（決定是否需人工介入）
+│   ├── implementer.md              # TDD Green 階段（Go）
+│   ├── frontend-test-writer.md    # React TDD Red 階段
+│   ├── frontend-implementer.md    # React TDD Green 階段
+│   ├── reviewer.md                 # 程式碼審查執行
+│   └── security-auditor.md        # 安全語意判斷
 ├── templates/               # 交接檔格式範本
 └── config/
     └── settings.example.json  # Claude Code agent 權限設定範例
@@ -61,6 +64,7 @@ claude --plugin-dir /path/to/ai-helper
 /plan-writer <ticket-id>           # 制定實作計畫（單 agent）
 /api-schema <ticket-id>            # 設計 API schema（按需要執行）
 /implement <ticket-id>             # TDD 實作（test-writer → 人工確認 → implementer）
+/frontend-implement <ticket-id>    # React TDD 實作（frontend-test-writer → 人工確認 → frontend-implementer）
 /smoke-test <ticket-id>            # 本地 Docker 啟動服務 + seed 資料 + curl/Postman 驗 API
 /bugfix <問題描述或 ticket 號碼>    # Bug 修復（跳過計畫階段）
 /refactor <目標檔案或描述>          # Go 程式碼重構（不改變外部行為）
