@@ -5,6 +5,23 @@ description: 根據產品需求文件（requirements.md）與原型（prototype�
 
 # 商業模式分析
 
+## 使用方式
+
+```
+/business-model-analysis <ticket-id 或專案路徑>
+/business-model-analysis          # 不指定則從當前目錄讀取輸入，報告寫入 tmp/business-model-analysis.md
+```
+
+## 輸出路徑
+
+從 `$ARGUMENTS` 解析目標：
+- 若有指定（如 `PROJ-123` 或 `path/to/project`）：報告寫入 `tmp/<ARGUMENTS>/business-model-analysis.md`，輸入文件從 `tmp/<ARGUMENTS>/` 與指定路徑下尋找
+- 若未指定：報告寫入 `tmp/business-model-analysis.md`，輸入文件從當前目錄尋找
+
+目錄不存在時先建立。
+
+---
+
 ## 目標
 閱讀產品的需求與原型，找出可行的商業模式與獲利方式，逐一評估其可行性、優缺點與風險，並提出驗證方法。產出的分析必須能讓產品負責人直接用來做決策。
 
@@ -54,7 +71,7 @@ description: 根據產品需求文件（requirements.md）與原型（prototype�
 
 ## 輸出格式
 
-請依以下結構產出報告，使用繁體中文：
+依「輸出路徑」規則將報告寫入對應的 `tmp/` 目錄，使用繁體中文，依以下結構撰寫：
 
 1. **產品摘要**（3 至 5 句）
 2. **目標使用者與核心價值**
